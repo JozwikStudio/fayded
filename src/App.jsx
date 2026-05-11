@@ -18,9 +18,8 @@ function drawPenis(ctx, x, y, size, angle, color) {
   const gr = size * 0.27;
   const br = size * 0.22;
 
-  ctx.shadowBlur  = size * 0.5;
-  ctx.shadowColor = color;
-  ctx.fillStyle   = color;
+  ctx.shadowBlur = 0;
+  ctx.fillStyle  = color;
 
   ctx.fillRect(-sw / 2, -sh / 2, sw, sh);
 
@@ -60,12 +59,16 @@ export default function App() {
     }
     window.addEventListener('resize', onResize);
 
+    const isMobile = W < 600;
+    const sizeBase = isMobile ? 8 : 14;
+    const sizeRange = isMobile ? 12 : 22;
+
     const particles = Array.from({ length: N_PARTICLES }, (_, i) => ({
       x:        Math.random() * W,
       y:        Math.random() * H,
       vx:       (Math.random() - 0.5) * 2.2,
       vy:       (Math.random() - 0.5) * 2.2,
-      size:     14 + Math.random() * 22,
+      size:     sizeBase + Math.random() * sizeRange,
       angle:    Math.random() * Math.PI * 2,
       rotSpeed: (Math.random() - 0.5) * 0.04,
       color:    PALETTE[i % PALETTE.length],
