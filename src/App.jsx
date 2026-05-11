@@ -229,6 +229,106 @@ export default function App() {
     };
   }, []);
 
+  // Shake-to-fart: DeviceMotion + Web Audio synthesis
+  useEffect(() => {
+    if (!window.DeviceMotionEvent) return;
+
+    let audioCtx = null;
+    let lastAccel = null;
+    let shakeStart = null;
+    let cooldown = false;
+
+    function playFart() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const duration = 0.55 + Math.random() * 0.45;
+      const rate = audioCtx.sampleRate;
+      const buf  = audioCtx.createBuffer(1, Math.floor(rate * duration), rate);
+      const data = buf.getChannelData(0);
+
+      // Brown noise
+      let last = 0;
+      for (let i = 0; i < data.length; i++) {
+        const w = Math.random() * 2 - 1;
+        last = (last + 0.02 * w) / 1.02;
+        data[i] = last * 3.5;
+      }
+
+      const src  = audioCtx.createBufferSource();
+      src.buffer = buf;
+
+      const lpf = audioCtx.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.setValueAtTime(380, audioCtx.currentTime);
+      lpf.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + duration);
+
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(2.2, audioCtx.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+      src.connect(lpf);
+      lpf.connect(gain);
+      gain.connect(audioCtx.destination);
+      src.start();
+    }
+
+    function onMotion(e) {
+      const a = e.accelerationIncludingGravity;
+      if (!a) return;
+      const cur = { x: a.x ?? 0, y: a.y ?? 0, z: a.z ?? 0 };
+
+      if (lastAccel) {
+        const delta = Math.abs(cur.x - lastAccel.x)
+                    + Math.abs(cur.y - lastAccel.y)
+                    + Math.abs(cur.z - lastAccel.z);
+
+        if (delta > 12) {
+          if (!shakeStart) shakeStart = Date.now();
+          if (!cooldown && Date.now() - shakeStart >= 2000) {
+            cooldown = true;
+            playFart();
+            setTimeout(() => { cooldown = false; shakeStart = null; }, 3000);
+          }
+        } else if (!cooldown) {
+          shakeStart = null;
+        }
+      }
+
+      lastAccel = cur;
+    }
+
+    // iOS 13+ requires explicit permission from a user gesture
+    function attachMotion() {
+      window.addEventListener('devicemotion', onMotion);
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const onGesture = async () => {
+        try {
+          if (await DeviceMotionEvent.requestPermission() === 'granted') attachMotion();
+        } catch {}
+      };
+      window.addEventListener('touchstart', onGesture, { once: true });
+      window.addEventListener('click',      onGesture, { once: true });
+    } else {
+      // Android / desktop — attach immediately, AudioContext on first gesture
+      window.addEventListener('devicemotion', onMotion);
+      const onGesture = () => {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      };
+      window.addEventListener('touchstart', onGesture, { once: true });
+      window.addEventListener('click',      onGesture, { once: true });
+    }
+
+    return () => {
+      window.removeEventListener('devicemotion', onMotion);
+      audioCtx?.close();
+    };
+  }, []);
+
   return (
     <div className="wrap">
       <canvas ref={canvasRef} className="bg-canvas" />
