@@ -1,12 +1,30 @@
 import { useEffect, useRef } from 'react';
 import './App.css';
 
-const PALETTE = [
-  '#FFDBB4', '#F5C6A0', '#EBB48A', '#E0A070',
-  '#D48C5C', '#C87848', '#B86A3A', '#A85C30',
-  '#F0C8A8', '#E8B890', '#DCA878', '#CC9060',
-  '#F8E0C8', '#C88050', '#B87040', '#E0B898',
+// Gradient stops: small=light skin, large=near black
+const SKIN_STOPS = [
+  { t: 0.00, r: 255, g: 219, b: 180 }, // #FFDBB4 very light
+  { t: 0.25, r: 235, g: 180, b: 138 }, // #EBB48A light
+  { t: 0.50, r: 200, g: 120, b:  72 }, // #C87848 medium
+  { t: 0.75, r: 120, g:  56, b:  18 }, // #783812 dark brown
+  { t: 1.00, r:  20, g:   8, b:   0 }, // #140800 near black
 ];
+
+function skinColor(t) {
+  let lo = SKIN_STOPS[0], hi = SKIN_STOPS[SKIN_STOPS.length - 1];
+  for (let i = 0; i < SKIN_STOPS.length - 1; i++) {
+    if (t >= SKIN_STOPS[i].t && t <= SKIN_STOPS[i + 1].t) {
+      lo = SKIN_STOPS[i];
+      hi = SKIN_STOPS[i + 1];
+      break;
+    }
+  }
+  const s = (t - lo.t) / (hi.t - lo.t);
+  const r = Math.round(lo.r + (hi.r - lo.r) * s);
+  const g = Math.round(lo.g + (hi.g - lo.g) * s);
+  const b = Math.round(lo.b + (hi.b - lo.b) * s);
+  return `rgb(${r},${g},${b})`;
+}
 
 function drawPenis(ctx, x, y, size, angle, color) {
   ctx.save();
@@ -60,19 +78,23 @@ export default function App() {
     window.addEventListener('resize', onResize);
 
     const isMobile = W < 600;
-    const sizeBase = isMobile ? 8 : 14;
-    const sizeRange = isMobile ? 12 : 22;
+    const sizeMin  = isMobile ?  8 : 14;
+    const sizeMax  = isMobile ? 40 : 72; // doubled from previous max
 
-    const particles = Array.from({ length: N_PARTICLES }, (_, i) => ({
-      x:        Math.random() * W,
-      y:        Math.random() * H,
-      vx:       (Math.random() - 0.5) * 2.2,
-      vy:       (Math.random() - 0.5) * 2.2,
-      size:     sizeBase + Math.random() * sizeRange,
-      angle:    Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.04,
-      color:    PALETTE[i % PALETTE.length],
-    }));
+    const particles = Array.from({ length: N_PARTICLES }, () => {
+      const t    = Math.random();            // 0=smallest/lightest, 1=biggest/darkest
+      const size = sizeMin + t * (sizeMax - sizeMin);
+      return {
+        x:        Math.random() * W,
+        y:        Math.random() * H,
+        vx:       (Math.random() - 0.5) * 2.2,
+        vy:       (Math.random() - 0.5) * 2.2,
+        size,
+        angle:    Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.04,
+        color:    skinColor(t),
+      };
+    });
 
     let raf;
 
@@ -88,10 +110,10 @@ export default function App() {
         p.y     += p.vy;
         p.angle += p.rotSpeed;
 
-        if (p.x < -60)    p.x = W + 60;
-        if (p.x > W + 60) p.x = -60;
-        if (p.y < -60)    p.y = H + 60;
-        if (p.y > H + 60) p.y = -60;
+        if (p.x < -80)    p.x = W + 80;
+        if (p.x > W + 80) p.x = -80;
+        if (p.y < -80)    p.y = H + 80;
+        if (p.y > H + 80) p.y = -80;
 
         drawPenis(ctx, p.x, p.y, p.size, p.angle, p.color);
       }
