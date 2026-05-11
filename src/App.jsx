@@ -166,11 +166,7 @@ export default function App() {
     let raf;
 
     function tick() {
-      ctx.save();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle  = 'rgba(0,0,0,0.18)';
-      ctx.fillRect(0, 0, W, H);
-      ctx.restore();
+      ctx.clearRect(0, 0, W, H);
 
       for (const p of particles) {
         p.x     += p.vx;
