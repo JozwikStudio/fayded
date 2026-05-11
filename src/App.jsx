@@ -26,13 +26,13 @@ function skinColor(t) {
   return `rgb(${r},${g},${b})`;
 }
 
-function drawPenis(ctx, x, y, size, angle, color) {
+function drawPenis(ctx, x, y, size, shRatio, angle, color) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
 
   const sw = size * 0.34;
-  const sh = size * 0.58;
+  const sh = size * shRatio;
   const gr = size * 0.27;
   const br = size * 0.22;
 
@@ -83,13 +83,15 @@ export default function App() {
 
     const particles = Array.from({ length: N_PARTICLES }, () => {
       const t    = Math.random();            // 0=smallest/lightest, 1=biggest/darkest
-      const size = sizeMin + t * (sizeMax - sizeMin);
+      const size    = sizeMin + t * (sizeMax - sizeMin);
+      const shRatio = 0.32 + t * 0.62; // short & stubby when small, long when large
       return {
         x:        Math.random() * W,
         y:        Math.random() * H,
         vx:       (Math.random() - 0.5) * 2.2,
         vy:       (Math.random() - 0.5) * 2.2,
         size,
+        shRatio,
         angle:    Math.random() * Math.PI * 2,
         rotSpeed: (Math.random() - 0.5) * 0.04,
         color:    skinColor(t),
@@ -115,7 +117,7 @@ export default function App() {
         if (p.y < -80)    p.y = H + 80;
         if (p.y > H + 80) p.y = -80;
 
-        drawPenis(ctx, p.x, p.y, p.size, p.angle, p.color);
+        drawPenis(ctx, p.x, p.y, p.size, p.shRatio, p.angle, p.color);
       }
 
       raf = requestAnimationFrame(tick);
