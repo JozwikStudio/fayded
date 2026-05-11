@@ -57,6 +57,22 @@ function drawPenis(ctx, x, y, size, shRatio, angle, color) {
 }
 
 const N_PARTICLES = 55;
+// ~1 spawn per 40s at 60fps; size 55–90px
+const POOP_CHANCE = 1 / 2400;
+
+function spawnPoop(W, H) {
+  const fromLeft = Math.random() < 0.5;
+  const size = 55 + Math.random() * 35;
+  return {
+    x:        fromLeft ? -size : W + size,
+    y:        size + Math.random() * (H - size * 2),
+    vx:       (fromLeft ? 1 : -1) * (1.2 + Math.random() * 1.2),
+    vy:       (Math.random() - 0.5) * 0.6,
+    size,
+    angle:    (Math.random() - 0.5) * 0.3,
+    rotSpeed: (Math.random() - 0.5) * 0.008,
+  };
+}
 
 export default function App() {
   const canvasRef = useRef(null);
@@ -76,6 +92,8 @@ export default function App() {
       canvas.height = H;
     }
     window.addEventListener('resize', onResize);
+
+    const poops = [];
 
     const isMobile = W < 600;
     const sizeMin  = isMobile ?  8 : 14;
@@ -118,6 +136,29 @@ export default function App() {
         if (p.y > H + 80) p.y = -80;
 
         drawPenis(ctx, p.x, p.y, p.size, p.shRatio, p.angle, p.color);
+      }
+
+      // Rarely spawn a poop
+      if (Math.random() < POOP_CHANCE) poops.push(spawnPoop(W, H));
+
+      // Move and draw poops; remove when fully off-screen
+      for (let i = poops.length - 1; i >= 0; i--) {
+        const p = poops[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.angle += p.rotSpeed;
+        if (p.x < -(p.size + 20) || p.x > W + p.size + 20) {
+          poops.splice(i, 1);
+          continue;
+        }
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.font = `${p.size}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💩', 0, 0);
+        ctx.restore();
       }
 
       raf = requestAnimationFrame(tick);
