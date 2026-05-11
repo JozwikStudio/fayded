@@ -26,6 +26,37 @@ function skinColor(t) {
   return `rgb(${r},${g},${b})`;
 }
 
+function drawVagina(ctx, x, y, size, angle, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  const w = size * 0.62;  // outer width
+  const h = size;          // outer height
+
+  // Labia majora — outer oval
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w, h, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Labia minora — slightly darker inner oval
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.52, h * 0.72, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Center slit — almond / vesica shape
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath();
+  ctx.moveTo(0, -h * 0.52);
+  ctx.bezierCurveTo( w * 0.28, -h * 0.12,  w * 0.28,  h * 0.12, 0,  h * 0.52);
+  ctx.bezierCurveTo(-w * 0.28,  h * 0.12, -w * 0.28, -h * 0.12, 0, -h * 0.52);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 function drawPenis(ctx, x, y, size, shRatio, angle, color) {
   ctx.save();
   ctx.translate(x, y);
@@ -57,8 +88,23 @@ function drawPenis(ctx, x, y, size, shRatio, angle, color) {
 }
 
 const N_PARTICLES = 55;
-// ~1 spawn per 40s at 60fps; size 55–90px
-const POOP_CHANCE = 1 / 2400;
+const POOP_CHANCE   = 1 / 2400; // ~every 40s at 60fps
+const VAGINA_CHANCE = 1 / 300;  // ~every 5s at 60fps
+
+function spawnVagina(W, H) {
+  const fromLeft = Math.random() < 0.5;
+  const size = 28 + Math.random() * 32; // 28–60px
+  return {
+    x:        fromLeft ? -size : W + size,
+    y:        size + Math.random() * (H - size * 2),
+    vx:       (fromLeft ? 1 : -1) * (1.4 + Math.random() * 1.4),
+    vy:       (Math.random() - 0.5) * 0.7,
+    size,
+    angle:    Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.018,
+    color:    skinColor(Math.random() * 0.65),
+  };
+}
 
 function spawnPoop(W, H) {
   const fromLeft = Math.random() < 0.5;
@@ -93,7 +139,8 @@ export default function App() {
     }
     window.addEventListener('resize', onResize);
 
-    const poops = [];
+    const poops   = [];
+    const vaginas = [];
 
     const isMobile = W < 600;
     const sizeMin  = isMobile ?  8 : 14;
@@ -136,6 +183,21 @@ export default function App() {
         if (p.y > H + 80) p.y = -80;
 
         drawPenis(ctx, p.x, p.y, p.size, p.shRatio, p.angle, p.color);
+      }
+
+      // Spawn vaginas every few seconds
+      if (Math.random() < VAGINA_CHANCE) vaginas.push(spawnVagina(W, H));
+
+      for (let i = vaginas.length - 1; i >= 0; i--) {
+        const v = vaginas[i];
+        v.x += v.vx;
+        v.y += v.vy;
+        v.angle += v.rotSpeed;
+        if (v.x < -(v.size + 20) || v.x > W + v.size + 20) {
+          vaginas.splice(i, 1);
+          continue;
+        }
+        drawVagina(ctx, v.x, v.y, v.size, v.angle, v.color);
       }
 
       // Rarely spawn a poop
