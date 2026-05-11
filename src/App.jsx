@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import './App.css';
 
 const PALETTE = [
-  '#ff2d87', '#ff69b4', '#ff1493', '#ff007f',
-  '#e91e8c', '#c0397a', '#9d4edd', '#da70d6',
-  '#ff6eb4', '#ff40a0', '#fc0fc0', '#ff85c8',
+  '#FFDBB4', '#F5C6A0', '#EBB48A', '#E0A070',
+  '#D48C5C', '#C87848', '#B86A3A', '#A85C30',
+  '#F0C8A8', '#E8B890', '#DCA878', '#CC9060',
+  '#F8E0C8', '#C88050', '#B87040', '#E0B898',
 ];
 
 function drawPenis(ctx, x, y, size, angle, color) {
@@ -17,7 +18,7 @@ function drawPenis(ctx, x, y, size, angle, color) {
   const gr = size * 0.27;   // glans radius
   const br = size * 0.22;   // ball radius
 
-  ctx.shadowBlur  = size * 0.9;
+  ctx.shadowBlur  = size * 0.4;
   ctx.shadowColor = color;
   ctx.fillStyle   = color;
 
@@ -56,7 +57,7 @@ function sampleLetterPositions(text, W, H) {
   ctx.fillText(text, W / 2, H / 2);
 
   const data = ctx.getImageData(0, 0, W, H).data;
-  const step = Math.max(5, Math.floor(fontSize / 28));
+  const step = Math.max(3, Math.floor(fontSize / 40));
   const pts  = [];
 
   for (let y = 0; y < H; y += step) {
@@ -76,7 +77,7 @@ function sampleLetterPositions(text, W, H) {
 
 const T_SCATTER  = 2200;
 const T_CONVERGE = 3000;
-const N_PARTICLES = 480;
+const N_PARTICLES = 900;
 
 export default function App() {
   const canvasRef = useRef(null);
@@ -103,7 +104,7 @@ export default function App() {
       ty:       t[1],
       vx:       (Math.random() - 0.5) * 7,
       vy:       (Math.random() - 0.5) * 7,
-      size:     7 + Math.random() * 9,
+      size:     5 + Math.random() * 5,
       angle:    Math.random() * Math.PI * 2,
       rotSpeed: (Math.random() - 0.5) * 0.14,
       color:    PALETTE[i % PALETTE.length],
