@@ -234,20 +234,31 @@ export default function App() {
     if (!window.DeviceMotionEvent) return;
 
     let audioCtx = null;
-    let lastAccel = null;
-    let shakeStart = null;
     let cooldown = false;
+    let lastAccel = null;
+    // Sliding-window: collect timestamps of shake peaks, trigger after enough in 2s
+    const shakeTimes = [];
+    const SHAKE_THRESHOLD = 8;   // m/s² delta per event — lower = more sensitive
+    const SHAKE_WINDOW    = 2000; // ms
+    const SHAKE_COUNT     = 20;  // events needed within the window
 
-    function playFart() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+    function ensureCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    async function playFart() {
+      const ctx = ensureCtx();
+      // Always resume — async, must await before scheduling audio
+      await ctx.resume();
 
       const duration = 0.55 + Math.random() * 0.45;
-      const rate = audioCtx.sampleRate;
-      const buf  = audioCtx.createBuffer(1, Math.floor(rate * duration), rate);
+      const rate = ctx.sampleRate;
+      const buf  = ctx.createBuffer(1, Math.floor(rate * duration), rate);
       const data = buf.getChannelData(0);
 
-      // Brown noise
       let last = 0;
       for (let i = 0; i < data.length; i++) {
         const w = Math.random() * 2 - 1;
@@ -255,27 +266,27 @@ export default function App() {
         data[i] = last * 3.5;
       }
 
-      const src  = audioCtx.createBufferSource();
+      const src = ctx.createBufferSource();
       src.buffer = buf;
 
-      const lpf = audioCtx.createBiquadFilter();
+      const lpf = ctx.createBiquadFilter();
       lpf.type = 'lowpass';
-      lpf.frequency.setValueAtTime(380, audioCtx.currentTime);
-      lpf.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + duration);
+      lpf.frequency.setValueAtTime(380, ctx.currentTime);
+      lpf.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + duration);
 
-      const gain = audioCtx.createGain();
-      gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-      gain.gain.linearRampToValueAtTime(2.2, audioCtx.currentTime + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(2.5, ctx.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
       src.connect(lpf);
       lpf.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       src.start();
     }
 
     function onMotion(e) {
-      const a = e.accelerationIncludingGravity;
+      const a = e.accelerationIncludingGravity || e.acceleration;
       if (!a) return;
       const cur = { x: a.x ?? 0, y: a.y ?? 0, z: a.z ?? 0 };
 
@@ -284,43 +295,46 @@ export default function App() {
                     + Math.abs(cur.y - lastAccel.y)
                     + Math.abs(cur.z - lastAccel.z);
 
-        if (delta > 12) {
-          if (!shakeStart) shakeStart = Date.now();
-          if (!cooldown && Date.now() - shakeStart >= 2000) {
+        if (delta > SHAKE_THRESHOLD) {
+          const now = Date.now();
+          shakeTimes.push(now);
+          // Evict old entries outside the window
+          const cutoff = now - SHAKE_WINDOW;
+          while (shakeTimes.length && shakeTimes[0] < cutoff) shakeTimes.shift();
+
+          if (!cooldown && shakeTimes.length >= SHAKE_COUNT) {
             cooldown = true;
+            shakeTimes.length = 0;
             playFart();
-            setTimeout(() => { cooldown = false; shakeStart = null; }, 3000);
+            setTimeout(() => { cooldown = false; }, 3000);
           }
-        } else if (!cooldown) {
-          shakeStart = null;
         }
       }
 
       lastAccel = cur;
     }
 
-    // iOS 13+ requires explicit permission from a user gesture
     function attachMotion() {
       window.addEventListener('devicemotion', onMotion);
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-      const onGesture = async () => {
+    // First user touch: unlock AudioContext + (iOS) request motion permission
+    async function onFirstGesture() {
+      ensureCtx();
+      if (typeof DeviceMotionEvent.requestPermission === 'function') {
         try {
-          if (await DeviceMotionEvent.requestPermission() === 'granted') attachMotion();
+          const perm = await DeviceMotionEvent.requestPermission();
+          if (perm === 'granted') attachMotion();
         } catch {}
-      };
-      window.addEventListener('touchstart', onGesture, { once: true });
-      window.addEventListener('click',      onGesture, { once: true });
-    } else {
-      // Android / desktop — attach immediately, AudioContext on first gesture
-      window.addEventListener('devicemotion', onMotion);
-      const onGesture = () => {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      };
-      window.addEventListener('touchstart', onGesture, { once: true });
-      window.addEventListener('click',      onGesture, { once: true });
+      }
+    }
+
+    window.addEventListener('touchstart', onFirstGesture, { once: true });
+    window.addEventListener('click',      onFirstGesture, { once: true });
+
+    // Android: attach motion immediately (no permission needed)
+    if (typeof DeviceMotionEvent.requestPermission !== 'function') {
+      attachMotion();
     }
 
     return () => {
